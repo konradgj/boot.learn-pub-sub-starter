@@ -34,7 +34,7 @@ func main() {
 		pubsub.Transient,
 	)
 	if err != nil {
-		log.Fatalf("err: %v", err)
+		log.Fatalf("could not bind queue: %v", err)
 	}
 
 	gameState := gamelogic.NewGameState(username)
