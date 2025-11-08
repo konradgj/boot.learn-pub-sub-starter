@@ -43,22 +43,23 @@ func SubscribeJSON[T any](
 		return fmt.Errorf("could not bind queue: %w", err)
 	}
 
-	deliveries, err := ch.Consume(queueName, "", false, false, false, false, nil)
+	messages, err := ch.Consume(queueName, "", false, false, false, false, nil)
 	if err != nil {
 		return fmt.Errorf("could not consume channel: %w", err)
 	}
 
 	go func() {
-		for delivery := range deliveries {
+		defer ch.Close()
+		for msg := range messages {
 			var data T
-			err := json.Unmarshal(delivery.Body, &data)
+			err := json.Unmarshal(msg.Body, &data)
 			if err != nil {
-				log.Printf("could not umarshal message: %w\n", err)
+				log.Printf("could not umarshal message: %v\n", err)
 				continue
 			}
 
 			handler(data)
-			if err := delivery.Ack(false); err != nil {
+			if err := msg.Ack(false); err != nil {
 				log.Printf("failed to ack message: %w\n", err)
 			}
 		}
