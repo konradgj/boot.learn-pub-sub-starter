@@ -26,10 +26,12 @@ func main() {
 		log.Fatal("could not get username")
 	}
 
+	userQ := fmt.Sprintf("%s.%s", routing.PauseKey, username)
+
 	_, _, err = pubsub.DeclareAndBind(
 		connection,
 		routing.ExchangePerilDirect,
-		fmt.Sprintf("%s.%s", routing.PauseKey, username),
+		userQ,
 		routing.PauseKey,
 		pubsub.Transient,
 	)
@@ -38,6 +40,17 @@ func main() {
 	}
 
 	gameState := gamelogic.NewGameState(username)
+	err = pubsub.SubscribeJSON(
+		connection,
+		routing.ExchangePerilDirect,
+		userQ,
+		routing.PauseKey,
+		pubsub.Transient,
+		handlerPause(gameState),
+	)
+	if err != nil {
+		log.Fatalf("could not subribe to queue: %v", err)
+	}
 
 LOOP:
 	for {
@@ -58,7 +71,7 @@ LOOP:
 				log.Printf("could not move: %v", err)
 				break
 			}
-			fmt.Printf("Movement successful")
+			fmt.Printf("Movement successful\n")
 		case "status":
 			gameState.CommandStatus()
 		case "help":
