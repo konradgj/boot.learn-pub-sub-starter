@@ -30,7 +30,7 @@ func main() {
 		connection,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
-		fmt.Sprintf("%s.*", routing.GameLogSlug),
+		routing.GameLogSlug+".*",
 		pubsub.Durable,
 	)
 	if err != nil {
