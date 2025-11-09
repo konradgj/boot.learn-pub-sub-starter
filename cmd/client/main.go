@@ -21,35 +21,63 @@ func main() {
 	defer connection.Close()
 	fmt.Println("Successfully created a connection.")
 
+	ch, err := connection.Channel()
+	if err != nil {
+		log.Fatalf("could not create channel on connection: %v", err)
+	}
+
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
 		log.Fatal("could not get username")
 	}
 
-	userQ := fmt.Sprintf("%s.%s", routing.PauseKey, username)
-
+	userPauseQ := fmt.Sprintf("%s.%s", routing.PauseKey, username)
 	_, _, err = pubsub.DeclareAndBind(
 		connection,
 		routing.ExchangePerilDirect,
-		userQ,
+		userPauseQ,
 		routing.PauseKey,
 		pubsub.Transient,
 	)
 	if err != nil {
-		log.Fatalf("could not bind queue: %v", err)
+		log.Fatalf("could not bind queue %s: %v", userPauseQ, err)
+	}
+
+	userMovesQ := fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, username)
+	_, _, err = pubsub.DeclareAndBind(
+		connection,
+		routing.ExchangePerilTopic,
+		userMovesQ,
+		fmt.Sprintf("%s.*", routing.ArmyMovesPrefix),
+		pubsub.Transient,
+	)
+	if err != nil {
+		log.Fatalf("could not bind to queue %s: %v", userMovesQ, err)
 	}
 
 	gameState := gamelogic.NewGameState(username)
 	err = pubsub.SubscribeJSON(
 		connection,
 		routing.ExchangePerilDirect,
-		userQ,
+		userPauseQ,
 		routing.PauseKey,
 		pubsub.Transient,
 		handlerPause(gameState),
 	)
 	if err != nil {
-		log.Fatalf("could not subribe to queue: %v", err)
+		log.Fatalf("could not subribe to queue %s: %v", userPauseQ, err)
+	}
+
+	err = pubsub.SubscribeJSON(
+		connection,
+		string(routing.ExchangePerilTopic),
+		userMovesQ,
+		fmt.Sprintf("%s.*", routing.ArmyMovesPrefix),
+		pubsub.Transient,
+		handlerMove(gameState),
+	)
+	if err != nil {
+		log.Fatalf("could not subribe to queue %s: %v", userPauseQ, err)
 	}
 
 LOOP:
@@ -66,12 +94,18 @@ LOOP:
 				log.Printf("could not spawn: %v", err)
 			}
 		case "move":
-			_, err := gameState.CommandMove(input)
+			mv, err := gameState.CommandMove(input)
 			if err != nil {
 				log.Printf("could not move: %v", err)
 				break
 			}
-			fmt.Printf("Movement successful\n")
+
+			err = pubsub.PublishJSON(ch, routing.ExchangePerilTopic, userMovesQ, mv)
+			if err != nil {
+				log.Printf("could not publish move: %v", err)
+			}
+
+			fmt.Printf("Movement successful published\n")
 		case "status":
 			gameState.CommandStatus()
 		case "help":
