@@ -142,6 +142,11 @@ func subscribe[T any](
 		return fmt.Errorf("could not bind queue: %w", err)
 	}
 
+	err = ch.Qos(10, 0, false)
+	if err != nil {
+		return fmt.Errorf("could not set prefetch settings: %w", err)
+	}
+
 	messages, err := ch.Consume(queueName, "", false, false, false, false, nil)
 	if err != nil {
 		return fmt.Errorf("could not consume channel: %w", err)
@@ -186,7 +191,7 @@ func DeclareAndBind(
 ) (*amqp.Channel, amqp.Queue, error) {
 	ch, err := conn.Channel()
 	if err != nil {
-		return nil, amqp.Queue{}, fmt.Errorf("could not create channel: %w", err)
+		return nil, amqp.Queue{}, fmt.Errorf("could not create channel %s: %w", key, err)
 	}
 
 	queue, err := ch.QueueDeclare(queueName,
