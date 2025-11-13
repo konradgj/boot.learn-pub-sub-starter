@@ -1,7 +1,9 @@
 package pubsub
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -22,6 +24,29 @@ const (
 	Durable = iota
 	Transient
 )
+
+func encode[T any](val T) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(val); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func PublishGob[T any](ch *amqp.Channel, exchange, key string, val T) error {
+	data, err := encode(val)
+	if err != nil {
+		return fmt.Errorf("could not encode val: %v", err)
+	}
+
+	ch.PublishWithContext(context.Background(), exchange, key, false, false, amqp.Publishing{
+		ContentType: "application/gob",
+		Body:        data,
+	})
+
+	return nil
+}
 
 func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	data, err := json.Marshal(val)

@@ -86,7 +86,7 @@ func main() {
 		routing.WarRecognitionsPrefix,
 		routing.WarRecognitionsPrefix+".*",
 		pubsub.Durable,
-		handlerWar(gameState),
+		handlerWar(gameState, ch),
 	)
 
 LOOP:

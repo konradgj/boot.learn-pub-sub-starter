@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -49,10 +50,10 @@ func handlerMove(gs *gamelogic.GameState, ch *amqp091.Channel) func(mv gamelogic
 	}
 }
 
-func handlerWar(gs *gamelogic.GameState) func(rw gamelogic.RecognitionOfWar) pubsub.AckType {
+func handlerWar(gs *gamelogic.GameState, ch *amqp091.Channel) func(rw gamelogic.RecognitionOfWar) pubsub.AckType {
 	return func(rw gamelogic.RecognitionOfWar) pubsub.AckType {
 		defer fmt.Print("> ")
-		out, _, _ := gs.HandleWar(rw)
+		out, winner, loser := gs.HandleWar(rw)
 
 		switch out {
 		case gamelogic.WarOutcomeNotInvolved:
@@ -60,10 +61,25 @@ func handlerWar(gs *gamelogic.GameState) func(rw gamelogic.RecognitionOfWar) pub
 		case gamelogic.WarOutcomeNoUnits:
 			return pubsub.NackDiscard
 		case gamelogic.WarOutcomeOpponentWon:
+			msg := fmt.Sprintf("%s, won a war against %s", winner, loser)
+			err := publishGameLog(ch, gs.GetUsername(), msg)
+			if err != nil {
+				return pubsub.NackRequeue
+			}
 			return pubsub.Ack
 		case gamelogic.WarOutcomeYouWon:
+			msg := fmt.Sprintf("%s, won a war against %s", winner, loser)
+			err := publishGameLog(ch, gs.GetUsername(), msg)
+			if err != nil {
+				return pubsub.NackRequeue
+			}
 			return pubsub.Ack
 		case gamelogic.WarOutcomeDraw:
+			msg := fmt.Sprintf("A war between %s and %s resulted in a draw", winner, loser)
+			err := publishGameLog(ch, gs.GetUsername(), msg)
+			if err != nil {
+				return pubsub.NackRequeue
+			}
 			return pubsub.Ack
 		default:
 			log.Printf("could not calulate war outcome, discarding msg")
@@ -71,4 +87,22 @@ func handlerWar(gs *gamelogic.GameState) func(rw gamelogic.RecognitionOfWar) pub
 
 		return pubsub.NackDiscard
 	}
+}
+
+func publishGameLog(ch *amqp091.Channel, username, msg string) error {
+	err := pubsub.PublishGob(
+		ch,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug+"."+username,
+		routing.GameLog{
+			CurrentTime: time.Now().UTC(),
+			Message:     msg,
+			Username:    username,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
