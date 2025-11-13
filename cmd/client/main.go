@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -120,7 +121,20 @@ LOOP:
 		case "help":
 			gamelogic.PrintClientHelp()
 		case "spam":
-			fmt.Println("Spamming not allowed yet!")
+			if len(input) < 2 {
+				fmt.Println("must provide amount")
+				break
+			}
+
+			num, err := strconv.Atoi(input[1])
+			if err != nil {
+				fmt.Println("wrong format")
+			}
+
+			for range num {
+				ml := gamelogic.GetMaliciousLog()
+				publishGameLog(ch, username, ml)
+			}
 		case "quit":
 			break LOOP
 		default:
