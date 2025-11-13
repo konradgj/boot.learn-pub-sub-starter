@@ -48,7 +48,7 @@ func main() {
 		connection,
 		routing.ExchangePerilTopic,
 		userMovesQ,
-		fmt.Sprintf("%s.*", routing.ArmyMovesPrefix),
+		routing.ArmyMovesPrefix+".*",
 		pubsub.Transient,
 	)
 	if err != nil {
@@ -70,15 +70,24 @@ func main() {
 
 	err = pubsub.SubscribeJSON(
 		connection,
-		string(routing.ExchangePerilTopic),
+		routing.ExchangePerilTopic,
 		userMovesQ,
-		fmt.Sprintf("%s.*", routing.ArmyMovesPrefix),
+		routing.ArmyMovesPrefix+".*",
 		pubsub.Transient,
-		handlerMove(gameState),
+		handlerMove(gameState, ch),
 	)
 	if err != nil {
 		log.Fatalf("could not subribe to queue %s: %v", userPauseQ, err)
 	}
+
+	err = pubsub.SubscribeJSON(
+		connection,
+		routing.ExchangePerilTopic,
+		routing.WarRecognitionsPrefix,
+		routing.WarRecognitionsPrefix,
+		pubsub.Durable,
+		handlerWar(gameState),
+	)
 
 LOOP:
 	for {

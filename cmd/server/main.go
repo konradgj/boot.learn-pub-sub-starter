@@ -37,6 +37,17 @@ func main() {
 		log.Fatalf("could not bind queue: %v", err)
 	}
 
+	_, _, err = pubsub.DeclareAndBind(
+		connection,
+		routing.ExchangePerilTopic,
+		routing.WarRecognitionsPrefix,
+		routing.WarRecognitionsPrefix+".*",
+		pubsub.Durable,
+	)
+	if err != nil {
+		log.Fatalf("could not bind queue: %v", err)
+	}
+
 	gamelogic.PrintServerHelp()
 LOOP:
 	for {
