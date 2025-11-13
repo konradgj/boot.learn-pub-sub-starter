@@ -84,7 +84,7 @@ func main() {
 		connection,
 		routing.ExchangePerilTopic,
 		routing.WarRecognitionsPrefix,
-		routing.WarRecognitionsPrefix,
+		routing.WarRecognitionsPrefix+".*",
 		pubsub.Durable,
 		handlerWar(gameState),
 	)
