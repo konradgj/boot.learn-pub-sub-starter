@@ -37,6 +37,15 @@ func main() {
 		log.Fatalf("could not bind queue: %v", err)
 	}
 
+	err = pubsub.SubscribeGob(
+		connection,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		routing.GameLogSlug+".*",
+		pubsub.Durable,
+		handlerGob(),
+	)
+
 	_, _, err = pubsub.DeclareAndBind(
 		connection,
 		routing.ExchangePerilTopic,

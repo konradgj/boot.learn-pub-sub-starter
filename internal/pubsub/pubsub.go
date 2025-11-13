@@ -34,6 +34,26 @@ func encode[T any](val T) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func decode[T any](data []byte) (T, error) {
+	buf := bytes.NewBuffer(data)
+	dec := gob.NewDecoder(buf)
+
+	var val T
+	if err := dec.Decode(&val); err != nil {
+		return val, err
+	}
+	return val, nil
+}
+
+func jsonDecode[T any](data []byte) (T, error) {
+	var res T
+	err := json.Unmarshal(data, &res)
+	if err != nil {
+		return res, err
+	}
+	return res, err
+}
+
 func PublishGob[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	data, err := encode(val)
 	if err != nil {
@@ -62,6 +82,29 @@ func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	return nil
 }
 
+func SubscribeGob[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
+	handler func(T) AckType,
+) error {
+	err := subscribe(
+		conn,
+		exchange,
+		queueName,
+		key,
+		queueType,
+		handler,
+		decode[T],
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func SubscribeJSON[T any](
 	conn *amqp.Connection,
 	exchange,
@@ -69,6 +112,30 @@ func SubscribeJSON[T any](
 	key string,
 	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
 	handler func(T) AckType,
+) error {
+	err := subscribe(
+		conn,
+		exchange,
+		queueName,
+		key,
+		queueType,
+		handler,
+		jsonDecode[T],
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func subscribe[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
+	handler func(T) AckType,
+	unmarshaller func([]byte) (T, error),
 ) error {
 	ch, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -83,8 +150,7 @@ func SubscribeJSON[T any](
 	go func() {
 		defer ch.Close()
 		for msg := range messages {
-			var data T
-			err := json.Unmarshal(msg.Body, &data)
+			data, err := unmarshaller(msg.Body)
 			if err != nil {
 				log.Printf("could not umarshal message: %v\n", err)
 				continue
