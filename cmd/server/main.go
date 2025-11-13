@@ -43,7 +43,7 @@ func main() {
 		routing.GameLogSlug,
 		routing.GameLogSlug+".*",
 		pubsub.Durable,
-		handlerGob(),
+		handlerLog(),
 	)
 
 	_, _, err = pubsub.DeclareAndBind(
